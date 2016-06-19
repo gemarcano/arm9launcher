@@ -37,7 +37,9 @@ int main()
 
 	UINT br;
 	f_read(&bootloader, (void*)0x20000000, f_size(&bootloader), &br);
-
+	
+	printf("Jumping to payload...\n");
+	ctr_flush_cache();
 	((void(*)(void))0x20000000)();
 
 	input_wait();
