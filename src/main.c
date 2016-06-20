@@ -30,7 +30,7 @@ int main()
 	FIL bootloader;
 
 	f_mount(&fs, "SD:", 0);
-	if (FR_OK != f_open(&bootloader, "SD:/gem_bootloader.bin", FA_READ | FA_OPEN_EXISTING))
+	if (FR_OK != f_open(&bootloader, "SD:/arm9launcher.bin", FA_READ | FA_OPEN_EXISTING))
 	{
 		on_error("Failed to open bootloader file!");
 	}
@@ -40,7 +40,9 @@ int main()
 	
 	printf("Jumping to payload...\n");
 	ctr_flush_cache();
-	((void(*)(void))0x20000000)();
+	char payload[256] = "SD:/arm9loaderhax.bin";
+	char *args[] = { payload };
+	((int(*)(int, char*[]))0x20000000)(1, args);
 
 	input_wait();
 	ctr_system_poweroff();
