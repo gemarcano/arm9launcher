@@ -8,8 +8,7 @@ _entry:
 	adr r2, main_offset
 	ldr r3, [r2]
 	add r2, r3, r2
-	blx r2
-	bx lr
+	bx r2
 
 main_offset:
 .word main-.

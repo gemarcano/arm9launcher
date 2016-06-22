@@ -12,6 +12,7 @@ int main()
 {
 	draw_init((draw_s*)0x23FFFE00);
 	console_init(0xFFFFFF, 0);
+	printf("13\n");
 	draw_clear_screen(SCREEN_TOP, 0x111111);
 
 	ctr_nand_interface nand_io;
@@ -19,8 +20,10 @@ int main()
 	ctr_nand_crypto_interface twl_io;
 	ctr_sd_interface sd_io;
 
+	printf("1\n");
 	int result = ctr_fatfs_initialize(&nand_io, &ctr_io, &twl_io, &sd_io);
 
+	printf("2\n");
 	if (result)
 	{
 		on_error("Failed to initialize IO system!");
@@ -35,15 +38,20 @@ int main()
 		on_error("Failed to open bootloader file!");
 	}
 
+	printf("3\n");
 	UINT br;
 	f_read(&bootloader, (void*)0x20000000, f_size(&bootloader), &br);
 	
+	printf("4\n");
 	printf("Jumping to payload...\n");
 	ctr_flush_cache();
 	char payload[256] = "SD:/arm9loaderhax.bin";
 	char *args[] = { payload };
 	((int(*)(int, char*[]))0x20000000)(1, args);
 
+	console_init(0xFFFFFF, 0);
+
+	printf("Press any key to power down\n");
 	input_wait();
 	ctr_system_poweroff();
 	return 0;

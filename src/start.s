@@ -5,37 +5,44 @@
 .section .text.start, "x"
 
 _entry:
-	mrs r0, cpsr
-	bic r0, r0, #0x1F
-
-	@system mode
-	orr r1, r0, #0x1F
-	msr cpsr_c, r1
-	ldr sp, =0x8000
-
-	@abort mode
-	orr r1, r0, #0x17
-	msr cpsr_c, r1
-	ldr sp, =0x8000
-
-	@IRQ mode
-	orr r1, r0, #0x12
-	msr cpsr_c, r1
-	ldr sp, =0x8000
-
-	@FIQ mode
-	orr r1, r0, #0x11
-	msr cpsr_c, r1
-	ldr sp, =0x8000
-
-	@supervisor mode
-	orr r1, r0, #0x13
-	msr cpsr_c, r1
-
 	@ Disable IRQ
 	mrs r0, cpsr
 	orr r0, r0, #0x80
 	msr cpsr_c, r0
+
+
+	@ Flush caches, make sure to sync memory with what's on the cache before
+	@ turning off the MPU
+	adr r0, flush_all_caches_offset
+	ldr r1, [r0]
+	add r0, r1, r0
+	blx r0
+
+	@ Disable caches and MPU
+	adr r0, disable_mpu_and_caching_offset
+	ldr r1, [r0]
+	add r0, r1, r0
+	blx r0
+
+	@ Flush caches, for good measure. Makes sure there is nothing in the caches
+	@ when the MPU is brought back online.
+	adr r0, flush_all_caches_offset
+	ldr r1, [r0]
+	add r0, r1, r0
+	blx r0
+
+	@ FIXME should we attempt to save the last stack?
+	@ Setup stacks
+	adr r0, setup_stacks_offset
+	ldr r1, [r0]
+	add r0, r1, r0
+	blx r0
+
+
+	@ Switch to system mode
+	mrs r0, cpsr
+	orr r1, r0, #0x1F
+	msr cpsr_c, r1
 
 	@ Change the stack pointer
 	ldr sp, =0x27F00000
@@ -45,33 +52,11 @@ _entry:
 	orr r0, r0, #(1<<18)
 	mcr p15, 0, r0, c1, c0, 0
 
-	@ Disable caches and MPU
-	adr r1, disable_mpu_and_caching_offset
-	ldr r2, [r1]
-	add r1, r2, r1
-	blx r1
-
-	@ Flush caches
-	adr r0, flush_all_caches_offset
+	@ clear bss
+	adr r0, clear_bss_offset
 	ldr r1, [r0]
 	add r0, r1, r0
 	blx r0
-
-	@clear bss
-	adr r0, __bss_start_offset
-	ldr r1, [r0]
-	add r0, r1, r0
-
-	adr r1, __bss_end_offset
-	ldr r2, [r1]
-	add r1, r2, r1
-	mov r2, #0
-	clear_bss_loop:
-		cmp r0, r1
-		beq clear_bss_loop_done
-		str r2, [r0], #4
-		b clear_bss_loop
-	clear_bss_loop_done:
 
 	@ Give read/write access to all the memory regions
 	ldr r0, =0x33333333
@@ -79,13 +64,12 @@ _entry:
 	mcr p15, 0, r0, c5, c0, 3 @ write instruction access
 
 	@ Set MPU permissions and cache settings
-	ldr r0, =0xFFFF001D @ ffff0000 32k | bootrom unprotected
-	ldr r1, =0x3000801B @ fff00000 16k | dtcm
-	#ldr r2, =0x01FF801D @ 01ff8000 32k | itcm
-	ldr r2, =0x00000035 @ 08000000 128MB | itcm
-	ldr r3, =0x08000029 @ 08000000 2M  | arm9 mem
-	ldr r4, =0x10000029 @ 10000000 2M  | io mem
-	ldr r5, =0x20000037 @ 20000000 256M| fcram
+	ldr r0, =0xFFFF001D @ ffff0000 32k   | bootrom unprotected
+	ldr r1, =0x3000801B @ 30000000 16k   | dtcm
+	ldr r2, =0x00000035 @ 00000000 128MB | itcm
+	ldr r3, =0x08000029 @ 08000000 2M    | arm9 mem
+	ldr r4, =0x10000029 @ 10000000 2M    | io mem
+	ldr r5, =0x20000037 @ 20000000 256M  | fcram
 	ldr r6, =0x1FF00027 @ 1FF00000 1M
 	ldr r7, =0x1800002D @ 18000000 8M
 	mcr p15, 0, r0, c6, c0, 0
@@ -96,7 +80,7 @@ _entry:
 	mcr p15, 0, r5, c6, c5, 0
 	mcr p15, 0, r6, c6, c6, 0
 	mcr p15, 0, r7, c6, c7, 0
-	mov r0, #0xA5
+	mov r0, #0xA5 @ FIXME which sections does this do... stuff to?
 	mcr p15, 0, r0, c2, c0, 0  @ data cacheable
 	mcr p15, 0, r0, c2, c0, 1  @ instruction cacheable
 	mcr p15, 0, r0, c3, c0, 0  @ data bufferable
@@ -112,19 +96,19 @@ _entry:
 	mov r1, #0x340
 	str r1, [r0]
 
+	@ Make sure to pass in argc as 0 and argv as NULL
 	mov r0, #0
 	mov r1, #0
+
+	@ Launch main(0, NULL)
 	adr r2, main_offset
 	ldr r3, [r2]
 	add r2, r3, r2
 	blx r2
 	bx lr
 
-__bss_start_offset:
-.word __bss_start-.
-
-__bss_end_offset:
-.word __bss_end-.
+	die:
+	b die @if we return, just forcibly hang (should we attempt to call the rest vector???)
 
 disable_mpu_and_caching_offset:
 .word disable_mpu_and_caching-.
@@ -138,8 +122,75 @@ relocate_section_offset:
 flush_all_caches_offset:
 .word flush_all_caches-.
 
+setup_stacks_offset:
+.word setup_stacks-.
+
+__bss_start_offset:
+.word __bss_start-.
+
+__bss_end_offset:
+.word __bss_end-.
+
+clear_bss_offset:
+.word clear_bss-.
+
 main_offset:
 .word main-.
+
+clear_bss:
+	@clear bss
+	adr r0, __bss_start_offset
+	ldr r1, [r0]
+	add r0, r1, r0
+
+	adr r1, __bss_end_offset
+	ldr r2, [r1]
+	add r1, r2, r1
+	mov r2, #0
+	.Lclear_bss_loop:
+		cmp r0, r1
+		beq .Lclear_bss_loop_done
+		str r2, [r0], #4
+		b .Lclear_bss_loop
+	.Lclear_bss_loop_done:
+	blx lr
+
+setup_stacks:
+	@ Set up the stacks for all CPU modes
+	@ start by clearing mode bits
+	mrs r0, cpsr
+	mov r2, r0 @ preserve current mode
+	bic r0, r0, #0x1F
+
+	@ System mode
+	orr r1, r0, #0x1F
+	msr cpsr_c, r1
+	ldr sp, =0x8000
+
+	@ Abort mode
+	orr r1, r0, #0x17
+	msr cpsr_c, r1
+	ldr sp, =0x8000
+
+	@ IRQ mode
+	orr r1, r0, #0x12
+	msr cpsr_c, r1
+	ldr sp, =0x8000
+
+	@ FIQ mode
+	orr r1, r0, #0x11
+	msr cpsr_c, r1
+	ldr sp, =0x8000
+
+	@ Supervisor mode
+	orr r1, r0, #0x13
+	msr cpsr_c, r1
+	ldr sp, =0x8000
+
+	@ Restore prvious mode
+	msr cpsr_c, r2
+
+	blx lr
 
 disable_mpu_and_caching:
 	@ Disable caches and MPU
@@ -185,15 +236,14 @@ relocation_base_offset:
 .word _entry-.
 
 flush_all_caches:
-	push {lr}
-	@ Flush caches
-	ldr r0, =0xFFFF0830 @ Nintendo's flush function in unprot. bootrom
-	blx r0
 
 	@ flush instruction cache, it's not flushed by Nintendo's function
 	mov r0, #0
 	mcr p15, 0, r0, c7, c5, 0
 
-	pop {lr}
-	bx lr
+	@ Nintendo's function uses r0-r2, r12, all registers that don't need
+	@ to be saved, just be aware that they are changed
+	@ use Nintendo's bx lr to return
+	ldr r0, =0xFFFF0830 @ Nintendo's flush function in unprot. bootrom
+	bx r0
 
