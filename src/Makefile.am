@@ -3,7 +3,7 @@ include $(top_srcdir)/common.mk
 noinst_PROGRAMS = arm9loaderhax arm9launcher
 arm9loaderhax_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/arm9loaderhax.ld -nostartfiles -I$(CTRARM9)/include
 arm9loaderhax_LDFLAGS=$(AM_LDFLAGS) -lctr
-arm9loaderhax_SOURCES = main.c start.s
+arm9loaderhax_SOURCES = main.c start.s a9l_config.h a9l_config.c
 arm9loaderhax_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr
 
 arm9launcher_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/bootloader.ld -nostartfiles -I$(CTRARM9)/include
