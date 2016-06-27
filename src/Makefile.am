@@ -11,7 +11,7 @@ arm9launcher_LDFLAGS=$(AM_LDFLAGS) -lctr
 arm9launcher_SOURCES = arm9launcher.c a_start.s
 arm9launcher_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr
 
-EXTRA_DIST = arm9loaderhax.ld
+EXTRA_DIST = arm9loaderhax.ld bootloader.ld
 
 all-local: arm9loaderhax.bin arm9launcher.bin
 clean-local:

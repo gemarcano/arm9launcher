@@ -171,6 +171,7 @@ static bool token_extract_button(const char *json, const jsmntok_t *token, ctr_h
 	for (size_t i = 0; i < button_strings_size; i++)
 	{
 		const char *str = &json[token->start];
+		//FIXME Case insensitive?
 		if (strncmp(button_strings[i], str, strlen(button_strings[i])) == 0)
 		{
 			*button = (ctr_hid_button_type)((1 << i) >> 1);
