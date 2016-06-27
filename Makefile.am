@@ -1,3 +1,3 @@
-SUBDIRS = src
+SUBDIRS = ext src
 
 #EXTRA_DIST = Doxyfile

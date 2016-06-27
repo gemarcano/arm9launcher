@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="1">
+    <root name="./"/>
+    <includedir>
+        <dir name="ext/"/>
+        <dir name="src/"/>
+        <dir name="/home/gabriel/.local/usr/arm-none-eabi-9/include/"/>
+        <dir name="/opt/devkitpro/devkitARM/arm-none-eabi/"/>
+    </includedir>
+</project>
