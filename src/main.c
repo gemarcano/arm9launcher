@@ -75,17 +75,20 @@ int main()
 	{
 		on_error("Failed to identify payload to launch");
 	}
-	f_read(&bootloader, (void*)0x20000000, f_size(&bootloader), &br);
+	f_read(&bootloader, (void*)0x08000000, f_size(&bootloader), &br);
 
 	char offset[256] = {0};
 	snprintf(offset, sizeof(offset), "%zu", entry->offset);
 	a9l_config_destroy(&config);
 
+	f_close(&bootloader);
+	f_close(&config_file);
+
 	printf("Jumping to payload...\n");
 	char *args[] = { payload, offset };
 
 	ctr_flush_cache();
-	((int(*)(int, char*[]))0x20000000)(2, args);
+	((int(*)(int, char*[]))0x08000000)(2, args);
 
 	console_init(0xFFFFFF, 0);
 

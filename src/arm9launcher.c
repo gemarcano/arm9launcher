@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
 		f_lseek(&fil, offset);
 		UINT br;
 		f_read(&fil, (void*)0x23F00000, f_size(&fil) - offset, &br);
+		f_close(&fil);
 		ctr_flush_cache();
 		((void (*)(void))0x23F00000)();
 	}
