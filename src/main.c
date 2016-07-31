@@ -7,6 +7,7 @@
 #include <ctr/draw.h>
 #include <ctr/console.h>
 #include <ctr9/ctr_hid.h>
+#include <ctr9/ctr_cache.h>
 
 #include <string.h>
 
@@ -75,7 +76,8 @@ int main()
 	{
 		on_error("Failed to identify payload to launch");
 	}
-	f_read(&bootloader, (void*)0x08000000, f_size(&bootloader), &br);
+	size_t bootloader_size = f_size(&bootloader);
+	f_read(&bootloader, (void*)0x08000000, bootloader_size, &br);
 
 	char offset[256] = {0};
 	snprintf(offset, sizeof(offset), "%zu", entry->offset);
@@ -87,7 +89,9 @@ int main()
 	printf("Jumping to payload...\n");
 	char *args[] = { payload, offset };
 
-	ctr_flush_cache();
+	ctr_cache_clean_data_range((void*)0x08000000, (void*)(0x08000000 + bootloader_size));
+	ctr_cache_flush_instruction_range((void*)0x08000000, (void*)(0x08000000 + bootloader_size));
+	ctr_cache_drain_write_buffer();
 	((int(*)(int, char*[]))0x08000000)(2, args);
 
 	console_init(0xFFFFFF, 0);

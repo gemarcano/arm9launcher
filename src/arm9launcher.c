@@ -2,6 +2,7 @@
 #include <ctr9/io/ctr_fatfs.h>
 #include <ctr9/ctr_system.h>
 #include <ctr/hid.h>
+#include <ctr9/ctr_cache.h>
 
 #include <stdlib.h>
 
@@ -28,9 +29,12 @@ int main(int argc, char *argv[])
 
 		f_lseek(&fil, offset);
 		UINT br;
-		f_read(&fil, (void*)0x23F00000, f_size(&fil) - offset, &br);
+		size_t payload_size = f_size(&fil) - offset;
+		f_read(&fil, (void*)0x23F00000, payload_size, &br);
 		f_close(&fil);
-		ctr_flush_cache();
+		ctr_cache_clean_data_range((void*)0x23F00000, (void*)(0x23F00000 + payload_size));
+		ctr_cache_flush_instruction_range((void*)0x23F00000, (void*)(0x23F00000 + payload_size));
+		ctr_cache_drain_write_buffer();
 		((void (*)(void))0x23F00000)();
 	}
 	return 0;
