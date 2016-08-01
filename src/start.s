@@ -70,8 +70,8 @@ _entry:
 	ldr r3, =0x08000029 @ 08000000 2M    | arm9 mem
 	ldr r4, =0x10000029 @ 10000000 2M    | io mem
 	ldr r5, =0x20000037 @ 20000000 256M  | fcram
-	ldr r6, =0x1FF00027 @ 1FF00000 1M
-	ldr r7, =0x1800002D @ 18000000 8M
+	ldr r6, =0x1FF00027 @ 1FF00000 1M    | DSP memory
+	ldr r7, =0x1800002D @ 18000000 8M    | vram
 	mcr p15, 0, r0, c6, c0, 0
 	mcr p15, 0, r1, c6, c1, 0
 	mcr p15, 0, r2, c6, c2, 0
@@ -80,7 +80,7 @@ _entry:
 	mcr p15, 0, r5, c6, c5, 0
 	mcr p15, 0, r6, c6, c6, 0
 	mcr p15, 0, r7, c6, c7, 0
-	mov r0, #0xAD @ FIXME which sections does this do... stuff to?
+	mov r0, #0b10101001        @ unprot | arm9 | fcram | vram
 	mcr p15, 0, r0, c2, c0, 0  @ data cacheable
 	mcr p15, 0, r0, c2, c0, 1  @ instruction cacheable
 	mcr p15, 0, r0, c3, c0, 0  @ data bufferable
@@ -165,27 +165,27 @@ setup_stacks:
 	@ System mode
 	orr r1, r0, #0x1F
 	msr cpsr_c, r1
-	ldr sp, =0x8000
+	ldr sp, =0x10000
 
 	@ Abort mode
 	orr r1, r0, #0x17
 	msr cpsr_c, r1
-	ldr sp, =0x8000
+	ldr sp, =0x10000
 
 	@ IRQ mode
 	orr r1, r0, #0x12
 	msr cpsr_c, r1
-	ldr sp, =0x8000
+	ldr sp, =0x10000
 
 	@ FIQ mode
 	orr r1, r0, #0x11
 	msr cpsr_c, r1
-	ldr sp, =0x8000
+	ldr sp, =0x10000
 
 	@ Supervisor mode
 	orr r1, r0, #0x13
 	msr cpsr_c, r1
-	ldr sp, =0x8000
+	ldr sp, =0x10000
 
 	@ Restore prvious mode
 	msr cpsr_c, r2
