@@ -1,3 +1,4 @@
+.arm
 .align 4
 
 .global _entry
