@@ -13,6 +13,7 @@
 #include <ctr9/ctr_system.h>
 #include <ctr9/ctr_hid.h>
 #include <ctr9/ctr_cache.h>
+#include <ctr9/ctr_system.h>
 
 #include <ctr/hid.h>
 #include <ctr/draw.h>
@@ -145,10 +146,15 @@ static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface
 
 static void initialize_fatfs(FATFS fs[])
 {
-	if ((ctr_sd_interface_inserted() && (FR_OK != f_mount(&fs[0], "SD:", 1))) ||
-		(FR_OK != f_mount(&fs[1], "CTRNAND:", 1)))
+	if (ctr_sd_interface_inserted() && (FR_OK != f_mount(&fs[0], "SD:", 1)))
 	{
-		on_error("Failed to mount filesystems!");
+		on_error("Failed to mount SD FATFS even though an SD card is (supposedly) inserted!");
+	}
+	
+	//FIXME This is a temporary workaround for N3DSs for slot 0x05y not being set up
+	if ((FR_OK != f_mount(&fs[1], "CTRNAND:", 1)) && (ctr_get_system_type() != SYSTEM_N3DS))
+	{
+		on_error("Failed to mount CTRNAND filesystem!");
 	}
 }
 
