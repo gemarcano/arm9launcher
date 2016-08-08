@@ -10,6 +10,8 @@
 
 .global _entry
 
+.extern ctr_twl_keyslot_setup
+
 .section .text.start, "x"
 
 _entry:

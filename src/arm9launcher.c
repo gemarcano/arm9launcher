@@ -20,6 +20,7 @@
 
 int main(int argc, char *argv[])
 {
+	ctr_twl_keyslot_setup(); //FIXME do I want this to be inside of ctr_fatfs_initialize by default?
 	if (argc == 2)
 	{
 		//Initialize all possible default IO systems
@@ -35,11 +36,12 @@ int main(int argc, char *argv[])
 		f_mount(&fs[0], "SD:", 0);
 		f_mount(&fs[1], "CTRNAND:", 0);
 		f_mount(&fs[2], "TWLN:", 0);
-		f_mount(&fs[3], "TWLN:", 0);
+		f_mount(&fs[3], "TWLP:", 0);
 
-		if (FR_OK != f_open(&fil, argv[0], FA_READ | FA_OPEN_EXISTING))
+		int result = f_open(&fil, argv[0], FA_READ | FA_OPEN_EXISTING);
+		if (FR_OK != result)
 		{
-			return 1;
+			return result;
 		}
 
 		//Read payload, then jump to it
