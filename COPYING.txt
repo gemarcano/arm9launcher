@@ -1,4 +1,4 @@
-(Work in progress) libctr9_io, a 3DS ARM9 disk IO framework and library.
+arm9launcher, a 3DS ARM9 bootloader.
 Copyright (C) 2016  Gabriel Marcano
 
 This program is free software: you can redistribute it and/or modify
@@ -17,10 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Only code written by Gabriel Marcano is under the terms of the GPL as
 outlined above. Other projects in use and their licenses:
 
-    sdmmc by Normmatt: Licensed under the MPL 2.0 (refer to sdmmc.h an
-        sdmmc.c)
-    aes and sha were taken from Godmode9 by d0k3: Licensed under the GPL 3.0 or
-         2.0 ??? seems to have been originally written by megazig
-    fatfs by ChaN: BSD-style licenced. Refer to
-        http://elm-chan.org/fsw/ff/en/appnote.html#license for more
-        information.
+    libctr9 by Gabriel Marcano: GPL 2 or later. 
+    ctr by Bilis: Not... really licensed on GitHub. I need to ask
+        Bilis for details...
