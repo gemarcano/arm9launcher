@@ -1,4 +1,4 @@
-AC_INIT([arm9launcher], [0.0.1], [], [])
+AC_INIT([arm9launcher], [0.0.2], [], [])
 AM_INIT_AUTOMAKE([foreign no-dist-gzip dist-xz subdir-objects])
 
 #Find AR and RANLIB for lto support before initializing libtool
