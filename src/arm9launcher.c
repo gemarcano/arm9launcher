@@ -6,6 +6,10 @@
  *
  ******************************************************************************/
 
+#include <elf.h>
+
+#include <ctrelf.h>
+
 #include <ctr9/io.h>
 #include <ctr9/io/ctr_fatfs.h>
 #include <ctr9/ctr_system.h>
@@ -13,6 +17,7 @@
 #include <ctr9/ctr_cache.h>
 
 #include <stdlib.h>
+
 
 #define PAYLOAD_ADDRESS (0x23F00000)
 #define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
@@ -44,21 +49,32 @@ int main(int argc, char *argv[])
 			return result;
 		}
 
-		//Read payload, then jump to it
-		size_t offset = (size_t)strtol(argv[1], NULL, 0);
-		size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
+		Elf32_Ehdr header;
+		load_header(&header, &fil);
 
-		f_lseek(&fil, offset);
+		if (check_elf(&header)) //ELF
+		{
+			load_segments(&header, &fil);
+			((void (*)(void))(header.e_entry))();
+		}
+		else
+		{
+			//Read payload, then jump to it
+			size_t offset = (size_t)strtol(argv[1], NULL, 0);
+			size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
 
-		UINT br;
-		f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
-		f_close(&fil);
+			f_lseek(&fil, offset);
 
-		ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
-		ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
-		ctr_cache_drain_write_buffer();
+			UINT br;
+			f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
+			f_close(&fil);
 
-		((void (*)(void))PAYLOAD_ADDRESS)();
+			ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
+			ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
+			ctr_cache_drain_write_buffer();
+
+			((void (*)(void))PAYLOAD_ADDRESS)();
+		}
 	}
 	return 0;
 }

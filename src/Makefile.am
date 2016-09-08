@@ -8,8 +8,8 @@ arm9loaderhax_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr $(top_builddir)/ext/libjsmn.
 
 arm9launcher_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/bootloader.ld -nostartfiles -I$(CTRARM9)/include
 arm9launcher_LDFLAGS=$(AM_LDFLAGS) -lctr
-arm9launcher_SOURCES = arm9launcher.c a_start.s
-arm9launcher_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr
+arm9launcher_SOURCES = arm9launcher.c a_start.s elf.c elf.h
+arm9launcher_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr -lctrelf
 
 EXTRA_DIST = arm9loaderhax.ld bootloader.ld
 
