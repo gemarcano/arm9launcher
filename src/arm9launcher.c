@@ -15,7 +15,6 @@
 #include <ctr9/ctr_system.h>
 #include <ctr/hid.h>
 #include <ctr9/ctr_cache.h>
-
 #include <stdlib.h>
 
 
@@ -25,6 +24,8 @@
 
 int main(int argc, char *argv[])
 {
+    draw_init((draw_s*)0x23FFFE00);
+    console_init(0xFFFFFF, 0);
 	ctr_twl_keyslot_setup(); //FIXME do I want this to be inside of ctr_fatfs_initialize by default?
 	if (argc == 2)
 	{
@@ -51,6 +52,7 @@ int main(int argc, char *argv[])
 
 		Elf32_Ehdr header;
 		load_header(&header, &fil);
+		f_lseek(&fil, 0);
 
 		if (check_elf(&header)) //ELF
 		{
