@@ -10,8 +10,6 @@
 
 .global _entry
 
-.extern ctr_twl_keyslot_setup
-
 .section .text.start, "x"
 
 _entry:
@@ -19,7 +17,6 @@ _entry:
 	mrs r0, cpsr
 	orr r0, r0, #0x80
 	msr cpsr_c, r0
-
 
 	@ Flush caches, make sure to sync memory with what's on the cache before
 	@ turning off the MPU
@@ -47,7 +44,6 @@ _entry:
 	ldr r1, [r0]
 	add r0, r1, r0
 	blx r0
-
 
 	@ Switch to system mode
 	mrs r0, cpsr

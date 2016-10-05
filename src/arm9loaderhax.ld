@@ -2,7 +2,7 @@ OUTPUT_ARCH(arm)
 ENTRY(_entry)
 SECTIONS
 {
-	. = 0x23F00000;
+	. = 0x20001000;
 	.text : {
 		*(.text.start)
 		*(.text)
@@ -19,7 +19,7 @@ SECTIONS
 		. = ALIGN(4);
 	}
 	__bss_end = .;
-	
+
 	.rodata : {
 		*(.rodata)
 		. = ALIGN(4);
