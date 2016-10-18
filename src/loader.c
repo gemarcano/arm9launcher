@@ -26,18 +26,15 @@
 
 #include <ctr/printf.h>
 
-#define A9L_ADDR 0x08000000u
-
 static void on_error(const char *error);
 static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons);
-static const char * find_file(const char *path);
+static const char *find_file(const char *path, const char* drives[], size_t number_of_drives);
 
-static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_sd_interface *sd_io);
+static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_nand_crypto_interface *twl_io, ctr_sd_interface *sd_io);
 static void initialize_fatfs(FATFS fs[]);
-static void load_bootloader(void);
-static void handle_payload(char *path, size_t path_size, char *offset, size_t offset_size, ctr_hid_button_type buttons_pressed);
+static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid_button_type buttons_pressed);
 
-int boot(int argc, char *argv[]);
+static int boot(const char *path, size_t offset);
 
 inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t size)
 {
@@ -61,26 +58,22 @@ int main()
 	draw_init((draw_s*)0x23FFFE00);
 	console_init(0xFFFFFF, 0);
 
-	tfp_printf("Console inited\n");
 	//IO initialization
 	ctr_nand_interface nand_io;
 	ctr_nand_crypto_interface ctr_io;
+	ctr_nand_crypto_interface twl_io;
 	ctr_sd_interface sd_io;
-	initialize_io(&nand_io, &ctr_io, &sd_io);
+	initialize_io(&nand_io, &ctr_io, &twl_io, &sd_io);
 
-	tfp_printf("IO inited\n");
 	//Initialize fatfs
-	FATFS fs[2];
+	FATFS fs[4];
 	initialize_fatfs(fs);
 
-	tfp_printf("fat inited\n");
-
 	char payload[256] = { 0 };
-	char offset[256] = { 0 };
-	handle_payload(payload, sizeof(payload), offset, sizeof(offset), buttons_pressed);
+	size_t offset = 0;
+	handle_payload(payload, sizeof(payload), &offset, buttons_pressed);
 
 	printf("Jumping to bootloader...\n");
-	char *args[] = { payload, offset };
 
 	//Bootloader has been cleaned to memory, and whatever is in the stack is safe
 	//since the bootloader doesn't flush the cache without cleaning. Just for
@@ -88,7 +81,7 @@ int main()
 	ctr_cache_drain_write_buffer();
 
 	//Jump to bootloader
-	int bootloader_result = boot(2, args);
+	int bootloader_result = boot(payload, offset);
 
 	//Re-init screen structures in case bootloader altered the memory controlling
 	//it.
@@ -104,7 +97,7 @@ int main()
 	return 0;
 }
 
-void on_error(const char *error)
+static void on_error(const char *error)
 {
 	printf(error);
 	printf("\nPress any key to shutdown.");
@@ -112,7 +105,7 @@ void on_error(const char *error)
 	ctr_system_poweroff();
 }
 
-const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons)
+static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons)
 {
 	size_t num_of_entries = a9l_config_get_number_of_entries(config);
 	for (size_t i = 0; i < num_of_entries; ++i)
@@ -126,28 +119,22 @@ const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_
 	return NULL;
 }
 
-static const char * find_file(const char *path)
+static const char *find_file(const char *path, const char* drives[], size_t number_of_drives)
 {
-	f_chdrive("SD:");
-	if (ctr_sd_interface_inserted() && (FR_OK == f_stat(path, NULL)))
+	for (size_t i = 0; i < number_of_drives; ++i)
 	{
-		return "SD:";
-	}
-	else
-	{
-		f_chdrive("CTRNAND:");
-		if (FR_OK == f_stat(path, NULL))
+		f_chdrive(drives[i]);
+		if (f_stat(path, NULL) == FR_OK)
 		{
-			return "CTRNAND:";
+			return drives[i];
 		}
 	}
-
 	return NULL;
 }
 
-static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_sd_interface *sd_io)
+static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_nand_crypto_interface *twl_io, ctr_sd_interface *sd_io)
 {
-	int result = ctr_fatfs_internal_initialize(nand_io, ctr_io, NULL);
+	int result = ctr_fatfs_internal_initialize(nand_io, ctr_io, twl_io);
 
 	if (result)
 	{
@@ -169,23 +156,28 @@ static void initialize_fatfs(FATFS fs[])
 		on_error("Failed to mount SD FATFS even though an SD card is (supposedly) inserted!");
 	}
 
-	//FIXME This is a temporary workaround for N3DSs for slot 0x05y not being set up
-	if ((FR_OK != f_mount(&fs[1], "CTRNAND:", 1)) && (ctr_get_system_type() != SYSTEM_N3DS))
+	if (FR_OK != f_mount(&fs[1], "CTRNAND:", 1))
 	{
 		on_error("Failed to mount CTRNAND filesystem!");
 	}
+
+	if (FR_OK != f_mount(&fs[2], "TWLN:", 1))
+	{
+		on_error("Failed to mount TWLN filesystem!");
+	}
+
+	if (FR_OK != f_mount(&fs[3], "TWLP:", 1))
+	{
+		on_error("Failed to mount TWLP filesystem!");
+	}
 }
 
-static void load_bootloader(void)
-{
-
-}
-
-static void handle_payload(char *path, size_t path_size, char *offset, size_t offset_size, ctr_hid_button_type buttons_pressed)
+static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid_button_type buttons_pressed)
 {
 	FIL config_file;
 	UINT br;
-	const char* drive = find_file("/arm9launcher.cfg");
+	const char *drives[] = { "SD:", "CTRNAND:", "TWLN:", "TWLP:" };
+	const char* drive = find_file("/arm9launcher.cfg", drives, 4);
 	if (!drive)
 	{
 		on_error("Unable to find configuration file!");
@@ -215,7 +207,6 @@ static void handle_payload(char *path, size_t path_size, char *offset, size_t of
 	free(buffer);
 
 	//Using a fixed buffer because this will be passed to bootloader via the stack.
-	char payload[256] = { 0 };
 	const a9l_config_entry *entry = select_payload(&config, buttons_pressed);
 	if (entry)
 	{
@@ -231,29 +222,11 @@ static void handle_payload(char *path, size_t path_size, char *offset, size_t of
 		on_error("Failed to identify payload to launch");
 	}
 
-	//Using a fixed buffer because this will be passed to bootloader via the stack.
-	int supposed_conversion = snprintf(offset, offset_size, "%zu", entry->offset);
-	if (supposed_conversion < 0)
-	{
-		on_error("Failed to convert offset number for payload specified!");
-	}
-
-	if ((size_t)supposed_conversion > offset_size)
-	{
-		on_error("Offset is too long/large!");
-	}
+	*offset = entry->offset;
 
 	//Done with configuration, ready to jump
 	a9l_config_destroy(&config);
 }
-
-/*******************************************************************************
- * Copyright (C) 2016 Gabriel Marcano
- *
- * Refer to the COPYING.txt file at the top of the project directory. If that is
- * missing, this file is licensed under the GPL version 2.0 or later.
- *
- ******************************************************************************/
 
 #include <elf.h>
 
@@ -266,68 +239,49 @@ static void handle_payload(char *path, size_t path_size, char *offset, size_t of
 #include <ctr9/ctr_cache.h>
 #include <stdlib.h>
 
-
 #define PAYLOAD_ADDRESS (0x23F00000)
 #define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
 #define PAYLOAD_FUNCTION ((void (*)(void))PAYLOAD_ADDRESS)
 
-int boot(int argc, char *argv[])
+int boot(const char *path, size_t offset)
 {
-	ctr_twl_keyslot_setup(); //FIXME do I want this to be inside of ctr_fatfs_initialize by default?
-	if (argc == 2)
+	//Initialize all possible default IO systems
+	FIL fil;
+
+	int result = f_open(&fil, path, FA_READ | FA_OPEN_EXISTING);
+	if (FR_OK != result)
 	{
-		//Initialize all possible default IO systems
-		ctr_nand_interface nand_io;
-		ctr_nand_crypto_interface ctr_io;
-		ctr_nand_crypto_interface twl_io;
-		ctr_sd_interface sd_io;
-		ctr_fatfs_initialize(&nand_io, &ctr_io, &twl_io, &sd_io);
+		return result;
+	}
 
-		FATFS fs[4];
-		FIL fil;
+	Elf32_Ehdr header;
+	load_header(&header, &fil);
+	f_lseek(&fil, 0);
 
-		f_mount(&fs[0], "SD:", 0);
-		f_mount(&fs[1], "CTRNAND:", 0);
-		f_mount(&fs[2], "TWLN:", 0);
-		f_mount(&fs[3], "TWLP:", 0);
+	//restore sha
+	vol_memcpy(REG_SHAHASH, otp_sha, 32);
 
-		int result = f_open(&fil, argv[0], FA_READ | FA_OPEN_EXISTING);
-		if (FR_OK != result)
-		{
-			return result;
-		}
+	if (check_elf(&header)) //ELF
+	{
+		//load_segments handles cache maintenance
+		load_segments(&header, &fil);
+		((void (*)(void))(header.e_entry))();
+	}
+	else
+	{
+		size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
 
-		Elf32_Ehdr header;
-		load_header(&header, &fil);
-		f_lseek(&fil, 0);
+		f_lseek(&fil, offset);
 
+		UINT br;
+		f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
+		f_close(&fil);
 
-		//restore sha
-		vol_memcpy(REG_SHAHASH, otp_sha, 32);
+		ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
+		ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
+		ctr_cache_drain_write_buffer();
 
-		if (check_elf(&header)) //ELF
-		{
-			load_segments(&header, &fil);
-			((void (*)(void))(header.e_entry))();
-		}
-		else
-		{
-			//Read payload, then jump to it
-			size_t offset = (size_t)strtol(argv[1], NULL, 0);
-			size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
-
-			f_lseek(&fil, offset);
-
-			UINT br;
-			f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
-			f_close(&fil);
-
-			ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
-			ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
-			ctr_cache_drain_write_buffer();
-
-			((void (*)(void))PAYLOAD_ADDRESS)();
-		}
+		((void (*)(void))PAYLOAD_ADDRESS)();
 	}
 	return 0;
 }
