@@ -9,8 +9,9 @@
 #include "a9l_config.h"
 
 #include <ctr9/io.h>
-#include <ctr9/io/ctr_fatfs.h>
 #include <ctr9/ctr_system.h>
+#include <ctr9/io/ctr_fatfs_dotab.h>
+#include <ctr9/io/ctr_console_dotab.h>
 #include <ctr9/ctr_hid.h>
 #include <ctr9/ctr_cache.h>
 #include <ctr9/ctr_system.h>
@@ -24,14 +25,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <ctr/printf.h>
+#include <sys/stat.h>
 
 static void on_error(const char *error);
 static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons);
 static const char *find_file(const char *path, const char* drives[], size_t number_of_drives);
 
-static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_nand_crypto_interface *twl_io, ctr_sd_interface *sd_io);
-static void initialize_fatfs(FATFS fs[]);
+static void initialize_io(void);
 static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid_button_type buttons_pressed);
 
 static int boot(const char *path, size_t offset);
@@ -54,20 +54,13 @@ int main()
 	//Now, before libctr9 does anything else, preserve sha state
 	vol_memcpy(otp_sha, REG_SHAHASH, 32);
 
+
 	//Prepare screen for diagnostic usage
 	draw_init((draw_s*)0x23FFFE00);
 	console_init(0xFFFFFF, 0);
 
 	//IO initialization
-	ctr_nand_interface nand_io;
-	ctr_nand_crypto_interface ctr_io;
-	ctr_nand_crypto_interface twl_io;
-	ctr_sd_interface sd_io;
-	initialize_io(&nand_io, &ctr_io, &twl_io, &sd_io);
-
-	//Initialize fatfs
-	FATFS fs[4];
-	initialize_fatfs(fs);
+	initialize_io();
 
 	char payload[256] = { 0 };
 	size_t offset = 0;
@@ -99,7 +92,7 @@ int main()
 
 static void on_error(const char *error)
 {
-	printf(error);
+	printf("%s", error);
 	printf("\nPress any key to shutdown.");
 	input_wait();
 	ctr_system_poweroff();
@@ -123,8 +116,9 @@ static const char *find_file(const char *path, const char* drives[], size_t numb
 {
 	for (size_t i = 0; i < number_of_drives; ++i)
 	{
-		f_chdrive(drives[i]);
-		if (f_stat(path, NULL) == FR_OK)
+		ctr_fatfs_dotab_chdrive(drives[i]);
+		struct stat st;
+		if (stat(path, &st) == 0)
 		{
 			return drives[i];
 		}
@@ -132,16 +126,21 @@ static const char *find_file(const char *path, const char* drives[], size_t numb
 	return NULL;
 }
 
-static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface *ctr_io, ctr_nand_crypto_interface *twl_io, ctr_sd_interface *sd_io)
+static void initialize_io(void)
 {
-	int result = ctr_fatfs_internal_initialize(nand_io, ctr_io, twl_io);
+	int result = ctr_console_dotab_initialize();
+
+	result |= ctr_fatfs_dotab_initialize();
+	result |= ctr_fatfs_dotab_check_ready("CTRNAND:");
+	result |= ctr_fatfs_dotab_check_ready("TWLN:");
+	result |= ctr_fatfs_dotab_check_ready("TWLP:");
 
 	if (result)
 	{
 		on_error("Failed to initialize internal IO system!");
 	}
 
-	result = ctr_fatfs_sd_initialize(sd_io);
+	result = ctr_fatfs_dotab_check_ready("SD:");
 
 	if (result && ctr_sd_interface_inserted())
 	{
@@ -149,33 +148,9 @@ static void initialize_io(ctr_nand_interface *nand_io, ctr_nand_crypto_interface
 	}
 }
 
-static void initialize_fatfs(FATFS fs[])
-{
-	if (ctr_sd_interface_inserted() && (FR_OK != f_mount(&fs[0], "SD:", 1)))
-	{
-		on_error("Failed to mount SD FATFS even though an SD card is (supposedly) inserted!");
-	}
-
-	if (FR_OK != f_mount(&fs[1], "CTRNAND:", 1))
-	{
-		on_error("Failed to mount CTRNAND filesystem!");
-	}
-
-	if (FR_OK != f_mount(&fs[2], "TWLN:", 1))
-	{
-		on_error("Failed to mount TWLN filesystem!");
-	}
-
-	if (FR_OK != f_mount(&fs[3], "TWLP:", 1))
-	{
-		on_error("Failed to mount TWLP filesystem!");
-	}
-}
-
 static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid_button_type buttons_pressed)
 {
-	FIL config_file;
-	UINT br;
+	FILE *config_file;
 	const char *drives[] = { "SD:", "CTRNAND:", "TWLN:", "TWLP:" };
 	const char* drive = find_file("/arm9launcher.cfg", drives, 4);
 	if (!drive)
@@ -183,16 +158,20 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 		on_error("Unable to find configuration file!");
 	}
 
-	f_chdrive(drive);
-	if (FR_OK != f_open(&config_file, "/arm9launcher.cfg", FA_READ | FA_OPEN_EXISTING))
+	ctr_fatfs_dotab_chdrive(drive);
+	config_file = fopen("/arm9launcher.cfg", "rb");
+	if (config_file == NULL)
 	{
 		on_error("Failed to open bootloader config!");
 	}
 
-	size_t buffer_size = f_size(&config_file) + 1; //FIXME we should limit the size...
+	struct stat st = { 0 };
+	fstat(fileno(config_file), &st);
+
+	size_t buffer_size = (size_t)(st.st_size) + 1; //FIXME we should limit the size...
 	char *buffer = malloc(buffer_size);
-	f_read(&config_file, buffer, buffer_size - 1, &br);
-	f_close(&config_file);
+	fread(buffer, buffer_size - 1, 1, config_file);
+	fclose(config_file);
 
 	buffer[buffer_size-1] = '\0'; //Make sure buffer, which should be all text, is null terminated.
 
@@ -233,30 +212,44 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 #include <ctrelf.h>
 
 #include <ctr9/io.h>
-#include <ctr9/io/ctr_fatfs.h>
 #include <ctr9/ctr_system.h>
 #include <ctr/hid.h>
 #include <ctr9/ctr_cache.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #define PAYLOAD_ADDRESS (0x23F00000)
 #define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
 #define PAYLOAD_FUNCTION ((void (*)(void))PAYLOAD_ADDRESS)
 
+static int set_position(FILE *file, uint64_t position)
+{
+	if (fseek(file, 0, SEEK_SET)) return -1;
+	while (position > LONG_MAX)
+	{
+		long pos = LONG_MAX;
+		if (fseek(file, pos, SEEK_CUR)) return -1;
+		position -= LONG_MAX;
+	}
+
+	if (fseek(file, position, SEEK_CUR)) return -1;
+	return 0;
+}
+
 int boot(const char *path, size_t offset)
 {
 	//Initialize all possible default IO systems
-	FIL fil;
+	FILE *fil;
 
-	int result = f_open(&fil, path, FA_READ | FA_OPEN_EXISTING);
-	if (FR_OK != result)
+	fil = fopen(path, "rb");
+	if (fil == NULL)
 	{
-		return result;
+		return -1;
 	}
 
 	Elf32_Ehdr header;
-	load_header(&header, &fil);
-	f_lseek(&fil, 0);
+	load_header(&header, fil);
+	fseek(fil, 0, SEEK_SET);
 
 	//restore sha
 	vol_memcpy(REG_SHAHASH, otp_sha, 32);
@@ -264,18 +257,19 @@ int boot(const char *path, size_t offset)
 	if (check_elf(&header)) //ELF
 	{
 		//load_segments handles cache maintenance
-		load_segments(&header, &fil);
+		load_segments(&header, fil);
 		((void (*)(void))(header.e_entry))();
 	}
 	else
 	{
-		size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
+		struct stat st;
+		fstat(fileno(fil), &st);
+		size_t payload_size = ((size_t)st.st_size) - offset; //FIXME Should we limit the size???
 
-		f_lseek(&fil, offset);
+		set_position(fil, offset);
 
-		UINT br;
-		f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
-		f_close(&fil);
+		fread(PAYLOAD_POINTER, payload_size, 1, fil);
+		fclose(fil);
 
 		ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
 		ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
