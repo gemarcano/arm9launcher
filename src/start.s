@@ -1,18 +1,10 @@
-@*******************************************************************************
-@* Copyright (C) 2016 Gabriel Marcano
-@*
-@* Refer to the COPYING.txt file at the top of the project directory. If that is
-@* missing, this file is licensed under the GPL version 2.0 or later.
-@*
-@******************************************************************************/
-
 .align 4
 
-.global _entry
+.global _start
 
 .section .text.start, "x"
 
-_entry:
+_start:
 	@ Disable IRQ
 	mrs r0, cpsr
 	orr r0, r0, #0x80
@@ -38,20 +30,13 @@ _entry:
 	add r0, r1, r0
 	blx r0
 
-	@ FIXME should we attempt to save the last stack?
-	@ Setup stacks
-	adr r0, setup_stacks_offset
-	ldr r1, [r0]
-	add r0, r1, r0
-	blx r0
-
 	@ Switch to system mode
 	mrs r0, cpsr
 	orr r1, r0, #0x1F
 	msr cpsr_c, r1
 
 	@ Change the stack pointer
-	ldr sp, =0x27F00000
+	ldr sp, =_stack
 
 	@ make sure ITCM is accessible
 	mrc p15, 0, r0, c1, c0, 0
@@ -114,7 +99,7 @@ _entry:
 	bx lr
 
 	die:
-	b die @if we return, just forcibly hang (should we attempt to call the rest vector???)
+	b die @if we return, just forcibly hang (should we attempt to call the reset vector???)
 
 disable_mpu_and_caching_offset:
 .word disable_mpu_and_caching-.
@@ -122,20 +107,14 @@ disable_mpu_and_caching_offset:
 enable_mpu_and_caching_offset:
 .word enable_mpu_and_caching-.
 
-relocate_section_offset:
-.word relocate_section-.
-
 flush_all_caches_offset:
 .word flush_all_caches-.
 
-setup_stacks_offset:
-.word setup_stacks-.
-
 __bss_start_offset:
-.word __bss_start-.
+.word __bss_start__-.
 
 __bss_end_offset:
-.word __bss_end-.
+.word __bss_end__-.
 
 clear_bss_offset:
 .word clear_bss-.
@@ -161,43 +140,6 @@ clear_bss:
 	.Lclear_bss_loop_done:
 	blx lr
 
-setup_stacks:
-	@ Set up the stacks for all CPU modes
-	@ start by clearing mode bits
-	mrs r0, cpsr
-	mov r2, r0 @ preserve current mode
-	bic r0, r0, #0x1F
-
-	@ System mode
-	orr r1, r0, #0x1F
-	msr cpsr_c, r1
-	ldr sp, =0x10000
-
-	@ Abort mode
-	orr r1, r0, #0x17
-	msr cpsr_c, r1
-	ldr sp, =0x10000
-
-	@ IRQ mode
-	orr r1, r0, #0x12
-	msr cpsr_c, r1
-	ldr sp, =0x10000
-
-	@ FIQ mode
-	orr r1, r0, #0x11
-	msr cpsr_c, r1
-	ldr sp, =0x10000
-
-	@ Supervisor mode
-	orr r1, r0, #0x13
-	msr cpsr_c, r1
-	ldr sp, =0x10000
-
-	@ Restore prvious mode
-	msr cpsr_c, r2
-
-	blx lr
-
 disable_mpu_and_caching:
 	@ Disable caches and MPU
 	mrc p15, 0, r0, c1, c0, 0  @ read control register
@@ -217,29 +159,6 @@ enable_mpu_and_caching:
 	mcr p15, 0, r0, c1, c0, 0  @ write control register
 
 	bx lr
-
-@ r0 - region start
-@ r1 - region end
-@ r2 - relocation base (usually starting PC address)
-relocate_section:
-
-	adr r2, relocation_base_offset
-	ldr r3, [r2]
-	add r2, r3, r2
-
-	.Lreloc_init:
-	cmp r0, r1
-	beq .Lrelocinit_done
-	ldr r3, [r0]
-	add r3, r2, r3
-	str r3, [r0], #4
-	b .Lreloc_init
-	.Lrelocinit_done:
-
-	bx lr
-
-relocation_base_offset:
-.word _entry-.
 
 flush_all_caches:
 

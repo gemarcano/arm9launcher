@@ -4,6 +4,7 @@ AM_INIT_AUTOMAKE([foreign no-dist-gzip dist-xz subdir-objects])
 #Find AR and RANLIB for lto support before initializing libtool
 AC_CHECK_TOOL([AR],gcc-ar)
 AC_CHECK_TOOL([RANLIB],gcc-ranlib)
+AC_CHECK_TOOL([STRIP_BIN],strip)
 LT_INIT
 
 AC_PROG_CC

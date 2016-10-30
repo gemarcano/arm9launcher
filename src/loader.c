@@ -10,8 +10,8 @@
 
 #include <ctr9/io.h>
 #include <ctr9/ctr_system.h>
-#include <ctr9/io/ctr_fatfs_dotab.h>
-#include <ctr9/io/ctr_console_dotab.h>
+#include <ctr9/io/ctr_drives.h>
+#include <ctr9/io/ctr_console.h>
 #include <ctr9/ctr_hid.h>
 #include <ctr9/ctr_cache.h>
 #include <ctr9/ctr_system.h>
@@ -116,7 +116,7 @@ static const char *find_file(const char *path, const char* drives[], size_t numb
 {
 	for (size_t i = 0; i < number_of_drives; ++i)
 	{
-		ctr_fatfs_dotab_chdrive(drives[i]);
+		ctr_drives_chdrive(drives[i]);
 		struct stat st;
 		if (stat(path, &st) == 0)
 		{
@@ -128,19 +128,19 @@ static const char *find_file(const char *path, const char* drives[], size_t numb
 
 static void initialize_io(void)
 {
-	int result = ctr_console_dotab_initialize();
+	int result = ctr_console_initialize();
 
-	result |= ctr_fatfs_dotab_initialize();
-	result |= ctr_fatfs_dotab_check_ready("CTRNAND:");
-	result |= ctr_fatfs_dotab_check_ready("TWLN:");
-	result |= ctr_fatfs_dotab_check_ready("TWLP:");
+	result |= ctr_drives_initialize();
+	result |= ctr_drives_check_ready("CTRNAND:");
+	result |= ctr_drives_check_ready("TWLN:");
+	result |= ctr_drives_check_ready("TWLP:");
 
 	if (result)
 	{
 		on_error("Failed to initialize internal IO system!");
 	}
 
-	result = ctr_fatfs_dotab_check_ready("SD:");
+	result = ctr_drives_check_ready("SD:");
 
 	if (result && ctr_sd_interface_inserted())
 	{
@@ -158,7 +158,7 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 		on_error("Unable to find configuration file!");
 	}
 
-	ctr_fatfs_dotab_chdrive(drive);
+	ctr_drives_chdrive(drive);
 	config_file = fopen("/arm9launcher.cfg", "rb");
 	if (config_file == NULL)
 	{
