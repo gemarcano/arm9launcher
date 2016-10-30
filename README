@@ -54,6 +54,10 @@ Build dependencies
     Make sure it is installed somewhere that the compiler can pick it up, or
     use -L and -I to instruct the compiler where to find it.
 
+ - https://github.com/gemarcano/ctrelf - Used for ELF parsing support. Make sure
+    it is installed somewhere that the compiler can pick it up, or use -L and -I
+	to instruct the compiler where to find it.
+
  - Autotools in general. These are used to create the build scripts.
 
  - https://github.com/gemarcano/libctr9 - Used for general 3DS ARM9
