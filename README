@@ -50,7 +50,7 @@ Note that this project is still under active development. Please
 Build dependencies
 --------------------------------------------------------------------------------
 
- - https://github.com/b1l1s/ctr - Used for unit tests
+ - https://github.com/gemarcano/ctr - Used by libctr9 for printing to console.
     Make sure it is installed somewhere that the compiler can pick it up, or
     use -L and -I to instruct the compiler where to find it.
 
@@ -65,21 +65,22 @@ Compiling
 --------------------------------------------------------------------------------
 
 The Autotools setup assumes that devkitarm is already in the PATH. It also
-assumes the environmental variable CTRARM9 is set to wherever the --prefix used
-to install libctr9 is.
+assumes that libctr9 and its dependencies are found in the provided --prefix
+path.
 
  # this following line is if the 3ds compiler isn't in the path
  export PATH=${PATH}:${DEVKITPRO}/bin:${DEVKITARM}/bin
+ 
  export CTRARM9=[root path of libctr9 installation]
  autoreconf -if
- ./configure --host arm-none-eabi 
+ ./configure --host arm-none-eabi --prefix=$CTRARM9
  make
 
 Example:
   export PATH=${PATH}:${DEVKITPRO}/bin:${DEVKITARM}/bin
   export CTRARM9=~/.local/usr/arm-none-eabi-9
   autoreconf -if
-  ./configure --host arm-none-eabi
+  ./configure --host arm-none-eabi --prefix=$CTRARM9
   make -j10
 
 
@@ -87,14 +88,14 @@ Example:
 Installation
 --------------------------------------------------------------------------------
 
-In the src/ directory after `make` is run, the files arm9loaderhax.bin and
-arm9launcher.bin are the loader and bootloader, respectively. These can be
-copied to the root of an SD card or the root of CTRNAND.
+In the src/ directory after `make` is run, the file arm9loaderhax.bin is the
+bootloader. Simply copy it to the root of the SD card or anywhere that the a9lh
+implementation looks for payloads.
 
-Besides the executables, the loader needs a configuration file,
-arm9launcher.cfg. An example configuration file is included on the root of the
-armlauncher repository. This configuration needs to be on the root of an SD
-card or CTRNAND.
+Besides the executable, the loader needs a configuration file, arm9launcher.cfg.
+An example configuration file is included on the root of the armlauncher
+repository. This configuration needs to be on the root of an SD, CTRNAND, TWLP,
+or TWLN.
 
 
 --------------------------------------------------------------------------------
