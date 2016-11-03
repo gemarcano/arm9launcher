@@ -117,8 +117,12 @@ _start:
 	blx r2
 	bx lr
 
-	die:
-	b die @if we return, just forcibly hang (should we attempt to call the reset vector???)
+	adr r1, exit_offset
+	ldr r2, [r1]
+	add r1, r2, r1
+	blx r1
+
+	b . @die if we return, just forcibly hang (should we attempt to call the reset vector???)
 
 disable_mpu_and_caching_offset:
 .word disable_mpu_and_caching-.
@@ -152,6 +156,9 @@ _init_offset:
 
 main_offset:
 .word main-.
+
+exit_offset:
+.word exit-.
 
 clear_bss:
 	@clear bss
