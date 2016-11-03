@@ -141,7 +141,6 @@ static void initialize_io(void)
 	}
 
 	result = ctr_drives_check_ready("SD:");
-
 	if (result && ctr_sd_interface_inserted())
 	{
 		on_error("SD card detected but failed to initialize it!");

@@ -11,8 +11,8 @@ ENTRY(_start)
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  /* Changed default address to 0x24F00000 */
-  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x20001000)); . = SEGMENT_START("text-segment", 0x20001000);
+  /* Changed default address to 0x20001000 */
+  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x20010000)); . = SEGMENT_START("text-segment", 0x20010000);
   .interp         : { *(.interp) }
   .note.gnu.build-id : { *(.note.gnu.build-id) }
   .hash           : { *(.hash) }
