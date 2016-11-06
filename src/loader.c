@@ -46,18 +46,16 @@ inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t s
 
 static uint8_t otp_sha[32];
 
+void __attribute__((constructor)) save_otp(void)
+{
+	//Now, before libctr9 does anything else, preserve sha state
+	vol_memcpy(otp_sha, REG_SHAHASH, 32);
+}
+
 int main()
 {
 	//Before anything else, immediately record the buttons to use for boot
 	ctr_hid_button_type buttons_pressed = ctr_hid_get_buttons();
-
-	//Now, before libctr9 does anything else, preserve sha state
-	vol_memcpy(otp_sha, REG_SHAHASH, 32);
-
-
-	//Prepare screen for diagnostic usage
-	draw_init((draw_s*)0x23FFFE00);
-	console_init(0xFFFFFF, 0);
 
 	//IO initialization
 	initialize_io();
@@ -128,10 +126,7 @@ static const char *find_file(const char *path, const char* drives[], size_t numb
 
 static void initialize_io(void)
 {
-	int result = ctr_console_initialize();
-
-	result |= ctr_drives_initialize();
-	result |= ctr_drives_check_ready("CTRNAND:");
+	int result = ctr_drives_check_ready("CTRNAND:");
 	result |= ctr_drives_check_ready("TWLN:");
 	result |= ctr_drives_check_ready("TWLP:");
 

@@ -68,7 +68,7 @@ SECTIONS
   /* Make sure the start.o entry is at the beginning since that's the default alh entry */
   arm9loaderhax_entry :
   {
-    start.o(.text.*)
+    *(.text.start)
   }
   .init           :
   {

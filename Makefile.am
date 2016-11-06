@@ -1,3 +1,4 @@
 SUBDIRS = ext src
 
-EXTRA_DIST = README COPYING.txt LICENSE-GPL3.txt LICENSE-GPL3.txt arm9launcher.cfg 
+EXTRA_DIST = README COPYING.txt LICENSE-GPL3.txt LICENSE-GPL3.txt arm9launcher.cfg
+
