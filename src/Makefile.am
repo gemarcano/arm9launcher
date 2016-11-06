@@ -1,15 +1,17 @@
 include $(top_srcdir)/common.mk
 
 noinst_PROGRAMS = arm9loaderhax arm9launcher
-arm9loaderhax_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/arm9loaderhax.ld -nostartfiles -I$(CTRARM9)/include -I$(top_srcdir)/ext
+arm9loaderhax_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/arm9loaderhax.ld -I$(prefix)/include -I$(top_srcdir)/ext
 arm9loaderhax_LDFLAGS=$(AM_LDFLAGS) -lctr
-arm9loaderhax_SOURCES = loader.c start.s a9l_config.h a9l_config.c
-arm9loaderhax_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr $(top_builddir)/ext/libjsmn.la
+arm9loaderhax_SOURCES=loader.c a9l_config.h a9l_config.c
+arm9loaderhax_LDFLAGS=-L$(prefix)/lib
+arm9loaderhax_LDADD=-lctr9 -lctr $(top_builddir)/ext/libjsmn.la
 
-arm9launcher_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/bootloader.ld -nostartfiles -I$(CTRARM9)/include
+arm9launcher_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/bootloader.ld -I$(prefix)/include
 arm9launcher_LDFLAGS=$(AM_LDFLAGS) -lctr
 arm9launcher_SOURCES = arm9launcher.c a_start.s elf.c elf.h
-arm9launcher_LDADD = -L$(CTRARM9)/lib -lctr9 -lctr -lctrelf
+arm9launcher_LDFLAGS=-L$(prefix)/lib
+arm9launcher_LDADD = -lctr9 -lctr -lctrelf
 
 EXTRA_DIST = arm9loaderhax.ld bootloader.ld
 

@@ -2,18 +2,33 @@
 #include <ctr9/ctr_cache.h>
 #include <elf.h>
 #include <string.h>
+#include <stdio.h>
+#include <limits.h>
 
-void load_header(Elf32_Ehdr *header, FIL *file)
+void load_header(Elf32_Ehdr *header, FILE *file)
 {
-	f_lseek(file, 0);
+	fseek(file, 0, SEEK_SET);
 	char buffer[sizeof(*header)];
-	UINT br;
-	int res = f_read(file, buffer, sizeof(buffer), &br);
+	fread(buffer, sizeof(buffer), 1, file);
 
 	elf_load_header(header, buffer);
 }
 
-int load_segment(const Elf32_Phdr *header, FIL *file)
+static int set_position(FILE *file, uint64_t position)
+{
+	if (fseek(file, 0, SEEK_SET)) return -1;
+	while (position > LONG_MAX)
+	{
+		long pos = LONG_MAX;
+		if (fseek(file, pos, SEEK_CUR)) return -1;
+		position -= LONG_MAX;
+	}
+
+	if (fseek(file, position, SEEK_CUR)) return -1;
+	return 0;
+}
+
+int load_segment(const Elf32_Phdr *header, FILE *file)
 {
 	size_t program_size = header->p_filesz;
 	size_t mem_size = header->p_memsz;
@@ -29,9 +44,8 @@ int load_segment(const Elf32_Phdr *header, FIL *file)
 			return 1;
 	}
 
-	f_lseek(file, header->p_offset);
-	UINT br;
-	f_read(file, location, program_size, &br);
+	set_position(file, header->p_offset);
+	fread(location, program_size, 1, file);
 	memset(program_size + (char*)location, 0, mem_size - program_size);
 
 	ctr_cache_clean_data_range(location, (char*)location + mem_size);
@@ -41,15 +55,14 @@ int load_segment(const Elf32_Phdr *header, FIL *file)
 	return 0;
 }
 
-int load_segments(const Elf32_Ehdr *header, FIL *file)
+int load_segments(const Elf32_Ehdr *header, FILE *file)
 {
 	int res = 0;
 	size_t pnum = header->e_phnum;
 	char buffer[pnum][header->e_phentsize];
-	UINT br;
 
-	f_lseek(file, header->e_phoff);
-	res = f_read(file, buffer, sizeof(buffer), &br);
+	set_position(file, header->e_phoff);
+	res = 1 != fread(buffer, sizeof(buffer), 1, file);
 
 	if (res)
 		return res;
@@ -68,7 +81,6 @@ int load_segments(const Elf32_Ehdr *header, FIL *file)
 
 bool check_elf(Elf32_Ehdr *header)
 {
-
 	if (!(header->e_ident[EI_MAG0] == (char)0x7f &&
 		header->e_ident[EI_MAG1] == 'E' &&
 		header->e_ident[EI_MAG2] == 'L' &&

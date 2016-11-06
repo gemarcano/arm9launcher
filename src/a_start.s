@@ -9,11 +9,11 @@
 .arm
 .align 4
 
-.global _entry
+.global _start
 
 .section .text.start, "x"
 
-_entry:
+_start:
 	adr r2, main_offset
 	ldr r3, [r2]
 	add r2, r3, r2

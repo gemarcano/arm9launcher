@@ -11,71 +11,86 @@
 #include <ctrelf.h>
 
 #include <ctr9/io.h>
-#include <ctr9/io/ctr_fatfs.h>
 #include <ctr9/ctr_system.h>
+#include <ctr9/io/ctr_drives.h>
 #include <ctr/hid.h>
 #include <ctr9/ctr_cache.h>
-#include <stdlib.h>
+#include <ctr9/sha.h>
 
+#include <stdlib.h>
+#include <limits.h>
+#include <sys/stat.h>
 
 #define PAYLOAD_ADDRESS (0x23F00000)
 #define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
 #define PAYLOAD_FUNCTION ((void (*)(void))PAYLOAD_ADDRESS)
 
+inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t size)
+{
+	volatile uint8_t *dst = dest;
+	volatile uint8_t *src = sorc;
+	while(size--)
+		dst[size] = src[size];
+}
+
+static int set_position(FILE *file, uint64_t position)
+{
+	if (fseek(file, 0, SEEK_SET)) return -1;
+	while (position > LONG_MAX)
+	{
+		long pos = LONG_MAX;
+		if (fseek(file, pos, SEEK_CUR)) return -1;
+		position -= LONG_MAX;
+	}
+
+	if (fseek(file, position, SEEK_CUR)) return -1;
+	return 0;
+}
+
+void ctr_libctr9_init(void);
+
 int main(int argc, char *argv[])
 {
-    draw_init((draw_s*)0x23FFFE00);
-    console_init(0xFFFFFF, 0);
-	ctr_twl_keyslot_setup(); //FIXME do I want this to be inside of ctr_fatfs_initialize by default?
-	if (argc == 2)
+	ctr_libctr9_init();
+	if (argc == 3)
 	{
 		//Initialize all possible default IO systems
-		ctr_nand_interface nand_io;
-		ctr_nand_crypto_interface ctr_io;
-		ctr_nand_crypto_interface twl_io;
-		ctr_sd_interface sd_io;
-		ctr_fatfs_initialize(&nand_io, &ctr_io, &twl_io, &sd_io);
-
-		FATFS fs[4];
-		FIL fil;
-
-		f_mount(&fs[0], "SD:", 0);
-		f_mount(&fs[1], "CTRNAND:", 0);
-		f_mount(&fs[2], "TWLN:", 0);
-		f_mount(&fs[3], "TWLP:", 0);
-
-		int result = f_open(&fil, argv[0], FA_READ | FA_OPEN_EXISTING);
-		if (FR_OK != result)
+		FILE *fil = fopen(argv[0], "rb");
+		if (!fil)
 		{
-			return result;
+			return -1;
 		}
 
 		Elf32_Ehdr header;
-		load_header(&header, &fil);
-		f_lseek(&fil, 0);
+		load_header(&header, fil);
+		fseek(fil, 0, SEEK_SET);
+
+		//Restore otp hash
+		vol_memcpy(REG_SHAHASH, argv[2], 32);
 
 		if (check_elf(&header)) //ELF
 		{
-			load_segments(&header, &fil);
-			((void (*)(void))(header.e_entry))();
+			load_segments(&header, fil);
+			((void (*)(int, const char *[]))(header.e_entry))(0, NULL);
 		}
 		else
 		{
 			//Read payload, then jump to it
 			size_t offset = (size_t)strtol(argv[1], NULL, 0);
-			size_t payload_size = f_size(&fil) - offset; //FIXME Should we limit the size???
+			struct stat st;
+			fstat(fileno(fil), &st);
+			size_t payload_size = ((size_t)st.st_size) - offset; //FIXME Should we limit the size???
 
-			f_lseek(&fil, offset);
+			set_position(fil, offset);
 
-			UINT br;
-			f_read(&fil, PAYLOAD_POINTER, payload_size, &br);
-			f_close(&fil);
+			fread(PAYLOAD_POINTER, payload_size, 1, fil);
+			fclose(fil);
 
 			ctr_cache_clean_data_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
 			ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
 			ctr_cache_drain_write_buffer();
 
-			((void (*)(void))PAYLOAD_ADDRESS)();
+			((void (*)(int, const char *[]))PAYLOAD_ADDRESS)(0, NULL);
 		}
 	}
 	return 0;
