@@ -17,15 +17,13 @@
 #include <ctr9/ctr_system.h>
 #include <ctr9/sha.h>
 
-#include <ctr/hid.h>
-#include <ctr/draw.h>
-#include <ctr/console.h>
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <sys/stat.h>
+
+void ctr_libctr9_init(void);
 
 static void on_error(const char *error);
 static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons);
@@ -76,7 +74,7 @@ int main()
 
 	//Re-init screen structures in case bootloader altered the memory controlling
 	//it.
-	console_init(0xFFFFFF, 0);
+	ctr_libctr9_init();
 	if (bootloader_result)
 	{
 		printf("An error was reported by the bootloader!\nError return: %d\n", bootloader_result);
@@ -207,7 +205,6 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 
 #include <ctr9/io.h>
 #include <ctr9/ctr_system.h>
-#include <ctr/hid.h>
 #include <ctr9/ctr_cache.h>
 #include <stdlib.h>
 #include <limits.h>
