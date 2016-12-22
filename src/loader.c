@@ -16,12 +16,15 @@
 #include <ctr9/ctr_cache.h>
 #include <ctr9/ctr_system.h>
 #include <ctr9/sha.h>
+#include <ctr9/ctr_interrupt.h>
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <sys/stat.h>
+
+#include "interrupt.h"
 
 void ctr_libctr9_init(void);
 
@@ -52,6 +55,11 @@ void __attribute__((constructor)) save_otp(void)
 
 int main()
 {
+	ctr_interrupt_prepare();
+	ctr_interrupt_set(CTR_INTERRUPT_DATABRT, abort_interrupt);
+	ctr_interrupt_set(CTR_INTERRUPT_UNDEF, undefined_instruction);
+	ctr_interrupt_set(CTR_INTERRUPT_PREABRT, prefetch_abort);
+
 	//Before anything else, immediately record the buttons to use for boot
 	ctr_hid_button_type buttons_pressed = ctr_hid_get_buttons();
 
@@ -80,7 +88,7 @@ int main()
 		printf("An error was reported by the bootloader!\nError return: %d\n", bootloader_result);
 	}
 	printf("Returned from the bootloader. Press any key to power down\n");
-	input_wait();
+	ctr_input_wait();
 
 	ctr_system_poweroff();
 	return 0;
@@ -90,7 +98,7 @@ static void on_error(const char *error)
 {
 	printf("%s", error);
 	printf("\nPress any key to shutdown.");
-	input_wait();
+	ctr_input_wait();
 	ctr_system_poweroff();
 }
 
@@ -242,6 +250,12 @@ int boot(const char *path, size_t offset)
 	load_header(&header, fil);
 	fseek(fil, 0, SEEK_SET);
 
+	int argc = 1;
+	char *payload_source = (char*)0x30000004;
+	strcpy(payload_source, path);
+	char **argv = (char**)0x30000000;
+	argv[0] = payload_source;
+
 	//restore sha
 	vol_memcpy(REG_SHAHASH, otp_sha, 32);
 
@@ -249,7 +263,7 @@ int boot(const char *path, size_t offset)
 	{
 		//load_segments handles cache maintenance
 		load_segments(&header, fil);
-		((void (*)(void))(header.e_entry))();
+		((void (*)(int, char*[]))(header.e_entry))(argc, argv);
 	}
 	else
 	{
@@ -266,8 +280,72 @@ int boot(const char *path, size_t offset)
 		ctr_cache_flush_instruction_range(PAYLOAD_POINTER, (void*)(PAYLOAD_ADDRESS + payload_size));
 		ctr_cache_drain_write_buffer();
 
-		((void (*)(void))PAYLOAD_ADDRESS)();
+		((void (*)(int, char*[]))PAYLOAD_ADDRESS)(argc, argv);
 	}
 	return 0;
+}
+
+#include <ctr9/ctr_system.h>
+#include <ctr9/ctr_interrupt.h>
+#include <ctr9/ctr_hid.h>
+
+#include <inttypes.h>
+#include <stdio.h>
+
+
+static void print_all_registers(uint32_t *registers)
+{
+	uint32_t cpsr = registers[0];
+	uint32_t sp = registers[1];
+	uint32_t lr = registers[2];
+	uint32_t ret = registers[3];
+	const uint32_t *r = registers+4;
+
+	printf("CPSR: 0x%08"PRIX32"\n", cpsr);
+	printf("SP: 0x%08"PRIX32"\n", sp);
+	printf("LR: 0x%08"PRIX32"\n", lr);
+	printf("Abort address: 0x%08"PRIXPTR"\n", (uintptr_t)(ret - 8));
+	for (size_t i = 0; i < 13; ++i)
+	{
+		printf("r%d: 0x%08"PRIX32"\n", i, r[i]);
+	}
+}
+
+void abort_interrupt(uint32_t *registers)
+{
+	printf("\n\nDATA ABORT:\n");
+
+	print_all_registers(registers);
+	ctr_input_wait();
+
+	uint32_t cpsr = registers[0];
+	if (cpsr & 0x20)
+	{
+		registers[3] -= 6;
+		printf("Ret. Thumb: 0x%08"PRIX32"\n", registers[3]);
+	}
+	else
+	{
+		registers[3] -= 4;
+		printf("Ret. ARM: 0x%08"PRIX32"\n", registers[3]);
+	}
+}
+
+void undefined_instruction(uint32_t *registers)
+{
+	printf("\n\nUNDEFINED INSTRUCTION:\n");
+
+	print_all_registers(registers);
+	ctr_input_wait();
+	ctr_system_poweroff();
+}
+
+void prefetch_abort(uint32_t *registers)
+{
+	printf("\n\nPREFETCH ABORT:\n");
+
+	print_all_registers(registers);
+	ctr_input_wait();
+	ctr_system_poweroff();
 }
 
