@@ -56,9 +56,9 @@ void __attribute__((constructor)) save_otp(void)
 int main()
 {
 	ctr_interrupt_prepare();
-	ctr_interrupt_set(CTR_INTERRUPT_DATABRT, abort_interrupt);
-	ctr_interrupt_set(CTR_INTERRUPT_UNDEF, undefined_instruction);
-	ctr_interrupt_set(CTR_INTERRUPT_PREABRT, prefetch_abort);
+	ctr_interrupt_set(CTR_INTERRUPT_DATABRT, abort_interrupt, NULL);
+	ctr_interrupt_set(CTR_INTERRUPT_UNDEF, undefined_instruction, NULL);
+	ctr_interrupt_set(CTR_INTERRUPT_PREABRT, prefetch_abort, NULL);
 
 	//Before anything else, immediately record the buttons to use for boot
 	ctr_hid_button_type buttons_pressed = ctr_hid_get_buttons();
@@ -207,7 +207,7 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 	a9l_config_destroy(&config);
 }
 
-#include <elf.h>
+#include <ctr9/ctr_elf_loader.h>
 
 #include <ctrelf.h>
 
@@ -247,7 +247,7 @@ int boot(const char *path, size_t offset)
 	}
 
 	Elf32_Ehdr header;
-	load_header(&header, fil);
+	ctr_load_header(&header, fil);
 	fseek(fil, 0, SEEK_SET);
 
 	int argc = 1;
@@ -259,10 +259,10 @@ int boot(const char *path, size_t offset)
 	//restore sha
 	vol_memcpy(REG_SHAHASH, otp_sha, 32);
 
-	if (check_elf(&header)) //ELF
+	if (ctr_check_elf(&header)) //ELF
 	{
 		//load_segments handles cache maintenance
-		load_segments(&header, fil);
+		ctr_load_segments(&header, fil);
 		((void (*)(int, char*[]))(header.e_entry))(argc, argv);
 	}
 	else
@@ -311,7 +311,7 @@ static void print_all_registers(uint32_t *registers)
 	}
 }
 
-void abort_interrupt(uint32_t *registers)
+void abort_interrupt(uint32_t *registers, void *data)
 {
 	printf("\n\nDATA ABORT:\n");
 
@@ -331,7 +331,7 @@ void abort_interrupt(uint32_t *registers)
 	}
 }
 
-void undefined_instruction(uint32_t *registers)
+void undefined_instruction(uint32_t *registers, void *data)
 {
 	printf("\n\nUNDEFINED INSTRUCTION:\n");
 
@@ -340,7 +340,7 @@ void undefined_instruction(uint32_t *registers)
 	ctr_system_poweroff();
 }
 
-void prefetch_abort(uint32_t *registers)
+void prefetch_abort(uint32_t *registers, void *data)
 {
 	printf("\n\nPREFETCH ABORT:\n");
 
