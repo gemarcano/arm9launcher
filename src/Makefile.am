@@ -5,13 +5,13 @@ arm9loaderhax_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/arm9loaderhax.ld -I$(prefix)/inclu
 arm9loaderhax_LDFLAGS=$(AM_LDFLAGS) -lctr
 arm9loaderhax_SOURCES=loader.c a9l_config.h a9l_config.c
 arm9loaderhax_LDFLAGS=-L$(prefix)/lib
-arm9loaderhax_LDADD=-lctr9 -lctr $(top_builddir)/ext/libjsmn.la
+arm9loaderhax_LDADD=-lctr9 -lctr_core -lfreetype $(top_builddir)/ext/libjsmn.la
 
 arm9launcher_CFLAGS=$(AM_CFLAGS) -T$(srcdir)/bootloader.ld -I$(prefix)/include
 arm9launcher_LDFLAGS=$(AM_LDFLAGS) -lctr
 arm9launcher_SOURCES = arm9launcher.c a_start.s elf.c elf.h
 arm9launcher_LDFLAGS=-L$(prefix)/lib
-arm9launcher_LDADD = -lctr9 -lctr -lctrelf
+arm9launcher_LDADD = -lctr9 -lctr_core -lctrelf -lfreetype
 
 EXTRA_DIST = arm9loaderhax.ld bootloader.ld
 

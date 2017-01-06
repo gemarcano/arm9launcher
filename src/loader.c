@@ -87,7 +87,7 @@ int main()
 		printf("An error was reported by the bootloader!\nError return: %d\n", bootloader_result);
 	}
 	printf("Returned from the bootloader. Press any key to power down\n");
-	input_wait();
+	ctr_input_wait();
 
 	ctr_system_poweroff();
 	return 0;
@@ -97,7 +97,7 @@ void on_error(const char *error)
 {
 	printf("%s", error);
 	printf("\nPress any key to shutdown.");
-	input_wait();
+	ctr_input_wait();
 	ctr_system_poweroff();
 }
 
