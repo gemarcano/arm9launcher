@@ -12,7 +12,7 @@ EXTRA_DIST = arm9loaderhax.ld
 
 FORCE:
 
-arm9loaderhax.bin: arm9loaderhax$(EXEEXT)
+arm9loaderhax.bin$(EXEEXT): arm9loaderhax$(EXEEXT)
 	cp $^ $@
 	$(STRIP_BIN) $@
 
