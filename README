@@ -73,14 +73,14 @@ to install libctr9 is.
  export PATH=${PATH}:${DEVKITPRO}/bin:${DEVKITARM}/bin
  export CTRARM9=[root path of libctr9 installation]
  autoreconf -if
- ./configure --host arm-none-eabi
+ ./configure --host arm-none-eabi --prefix=$CTRARM9
  make
 
 Example:
   export PATH=${PATH}:${DEVKITPRO}/bin:${DEVKITARM}/bin
   export CTRARM9=~/.local/usr/arm-none-eabi-9
   autoreconf -if
-  ./configure --host arm-none-eabi
+  ./configure --host arm-none-eabi --prefix=$CTRARM9
   make -j10
 
 
