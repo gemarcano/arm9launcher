@@ -26,43 +26,45 @@ an application to showcase the usage of his general purpose libctr9 3DS ARM9
 code library.
 
 Currently arm9launcher supports the following:
-    
+
   -Button based payload selection, configurable via a configuration file
-    
+
   -Human readable configuration file, in JSON format
-    
+
   -Payloads can be launched from an external SD card, and internal CTRNAND,
         TWLN, and TWLP partitions
-    
+
   -The configuration and bootloader files can be stored in CTRNAND or an SD
     card.
 
 Planned features:
-  
+
   -Menu based payload selection
-  
+
   --Author is open to suggestions
 
 
-Note that this project is still under active development. Please
+Note that this project is still under active development.
+
 
 --------------------------------------------------------------------------------
 Build dependencies
 --------------------------------------------------------------------------------
 
- - https://github.com/gemarcano/ctr - Used by libctr9 for printing to console.
-    Make sure it is installed somewhere that the compiler can pick it up, or
-    use -L and -I to instruct the compiler where to find it.
+ - https://github.com/gemarcano/libctr_core - Used by libctr9. Make sure it is
+    installed somewhere that the compiler can pick it up, or use -L and -I to
+    instruct the compiler where to find it.
 
  - https://github.com/gemarcano/ctrelf - Used for ELF parsing support. Make sure
     it is installed somewhere that the compiler can pick it up, or use -L and -I
-	to instruct the compiler where to find it.
-
- - Autotools in general. These are used to create the build scripts.
+    to instruct the compiler where to find it.
 
  - https://github.com/gemarcano/libctr9 - Used for general 3DS ARM9
     functionality.
     See that repository for instruction on how to install it.
+
+ - Autotools in general. These are used to create the build scripts.
+
 
 --------------------------------------------------------------------------------
 Compiling
@@ -74,7 +76,7 @@ path.
 
  # this following line is if the 3ds compiler isn't in the path
  export PATH=${PATH}:${DEVKITPRO}/bin:${DEVKITARM}/bin
- 
+
  export CTRARM9=[root path of libctr9 installation]
  autoreconf -if
  ./configure --host arm-none-eabi --prefix=$CTRARM9
