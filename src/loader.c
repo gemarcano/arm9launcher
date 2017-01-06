@@ -16,8 +16,6 @@
 #include <ctr9/io/ctr_drives.h>
 #include <ctr9/sha.h>
 
-#include <ctr/hid.h>
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -13,7 +13,6 @@
 #include <ctr9/io.h>
 #include <ctr9/ctr_system.h>
 #include <ctr9/io/ctr_drives.h>
-#include <ctr/hid.h>
 #include <ctr9/ctr_cache.h>
 #include <ctr9/sha.h>
 
