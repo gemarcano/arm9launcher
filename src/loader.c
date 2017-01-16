@@ -17,17 +17,29 @@
 #include <ctr9/ctr_system.h>
 #include <ctr9/sha.h>
 #include <ctr9/ctr_interrupt.h>
+#include <ctr9/ctr_elf_loader.h>
 
+#include <ctrelf.h>
+
+#include <stdint.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <stdio.h>
+#include <inttypes.h>
 
 #include <sys/stat.h>
 
 #include "interrupt.h"
 
+#define PAYLOAD_ADDRESS (0x23F00000)
+#define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
+#define PAYLOAD_FUNCTION ((void (*)(void))PAYLOAD_ADDRESS)
+
+static uint8_t otp_sha[32];
 void ctr_libctr9_init(void);
 
+//Helper functions
 static void on_error(const char *error);
 static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_button_type buttons);
 static const char *find_file(const char *path, const char* drives[], size_t number_of_drives);
@@ -36,17 +48,10 @@ static void initialize_io(void);
 static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid_button_type buttons_pressed);
 
 static int boot(const char *path, size_t offset);
+static int set_position(FILE *file, uint64_t position);
+inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t size);
 
-inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t size)
-{
-	volatile uint8_t *dst = dest;
-	volatile uint8_t *src = sorc;
-	while(size--)
-		dst[size] = src[size];
-}
-
-static uint8_t otp_sha[32];
-
+void __attribute__((constructor)) save_otp(void);
 void __attribute__((constructor)) save_otp(void)
 {
 	//Now, before libctr9 does anything else, preserve sha state
@@ -69,8 +74,6 @@ int main()
 	char payload[256] = { 0 };
 	size_t offset = 0;
 	handle_payload(payload, sizeof(payload), &offset, buttons_pressed);
-
-	printf("Jumping to bootloader...\n");
 
 	//Bootloader has been cleaned to memory, and whatever is in the stack is safe
 	//since the bootloader doesn't flush the cache without cleaning. Just for
@@ -210,34 +213,6 @@ static void handle_payload(char *path, size_t path_size, size_t *offset, ctr_hid
 	a9l_config_destroy(&config);
 }
 
-#include <ctr9/ctr_elf_loader.h>
-
-#include <ctrelf.h>
-
-#include <ctr9/io.h>
-#include <ctr9/ctr_system.h>
-#include <ctr9/ctr_cache.h>
-#include <stdlib.h>
-#include <limits.h>
-
-#define PAYLOAD_ADDRESS (0x23F00000)
-#define PAYLOAD_POINTER ((void*)PAYLOAD_ADDRESS)
-#define PAYLOAD_FUNCTION ((void (*)(void))PAYLOAD_ADDRESS)
-
-static int set_position(FILE *file, uint64_t position)
-{
-	if (fseek(file, 0, SEEK_SET)) return -1;
-	while (position > LONG_MAX)
-	{
-		long pos = LONG_MAX;
-		if (fseek(file, pos, SEEK_CUR)) return -1;
-		position -= LONG_MAX;
-	}
-
-	if (fseek(file, position, SEEK_CUR)) return -1;
-	return 0;
-}
-
 int boot(const char *path, size_t offset)
 {
 	//Initialize all possible default IO systems
@@ -287,13 +262,6 @@ int boot(const char *path, size_t offset)
 	}
 	return 0;
 }
-
-#include <ctr9/ctr_system.h>
-#include <ctr9/ctr_interrupt.h>
-#include <ctr9/ctr_hid.h>
-
-#include <inttypes.h>
-#include <stdio.h>
 
 
 static void print_all_registers(uint32_t *registers)
@@ -350,5 +318,27 @@ void prefetch_abort(uint32_t *registers, void *data)
 	print_all_registers(registers);
 	ctr_input_wait();
 	ctr_system_poweroff();
+}
+
+static int set_position(FILE *file, uint64_t position)
+{
+	if (fseek(file, 0, SEEK_SET)) return -1;
+	while (position > LONG_MAX)
+	{
+		long pos = LONG_MAX;
+		if (fseek(file, pos, SEEK_CUR)) return -1;
+		position -= LONG_MAX;
+	}
+
+	if (fseek(file, position, SEEK_CUR)) return -1;
+	return 0;
+}
+
+inline static void vol_memcpy(volatile void *dest, volatile void *sorc, size_t size)
+{
+	volatile uint8_t *dst = dest;
+	volatile uint8_t *src = sorc;
+	while(size--)
+		dst[size] = src[size];
 }
 
