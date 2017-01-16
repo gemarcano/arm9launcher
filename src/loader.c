@@ -108,7 +108,10 @@ static const a9l_config_entry* select_payload(const a9l_config *config, ctr_hid_
 	for (size_t i = 0; i < num_of_entries; ++i)
 	{
 		a9l_config_entry *entry = a9l_config_get_entry(config, i);
-		if (entry->buttons == buttons)
+
+		struct stat buffer;
+		bool exists = !stat(entry->payload, &buffer);
+		if (exists && entry->buttons == buttons)
 		{
 			return entry;
 		}
